@@ -1,65 +1,47 @@
 FROM centos:centos6
 
-RUN echo STARTING SERVER BUILD ... [$(date)]
+# Add repos
+RUN yum install wget -y && \
+    rpm --import http://apt.sw.be/RPM-GPG-KEY.dag.txt && \
+    wget http://pkgs.repoforge.org/rpmforge-release/rpmforge-release-0.5.3-1.el6.rf.x86_64.rpm && \
+    rpm -K rpmforge-release*.rpm && \
+    rpm -i rpmforge-release*.rpm && \
+    rm -f rpmforge-release*.rpm && \
+    rpm --import https://fedoraproject.org/static/0608B895.txt && \
+    rpm -Uvh http://download-i2.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
+COPY etc/yum.repos.d/remi.repo /etc/yum.repos.d/remi.repo
 
-# supervisord setup
-RUN yum install python-setuptools -y
-RUN easy_install pip
-RUN pip install supervisor==3.1.2
-COPY env/etc/supervisord /etc/supervisord
-
-# Update Repos
-RUN yum install wget -y
-RUN wget -O /etc/yum.repos.d/remi.repo http://rpms.famillecollet.com/enterprise/remi.repo
-RUN rpm --import http://apt.sw.be/RPM-GPG-KEY.dag.txt
-RUN wget http://pkgs.repoforge.org/rpmforge-release/rpmforge-release-0.5.3-1.el6.rf.x86_64.rpm
-RUN rpm -K rpmforge-release*.rpm
-RUN rpm -i rpmforge-release*.rpm
-RUN rm -f rpmforge-release*.rpm
-RUN rpm --import https://fedoraproject.org/static/0608B895.txt
-RUN rpm -Uvh http://download-i2.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
-
-# Install Apache and PHP
-RUN yum clean all
-RUN yum update -y
-RUN yum groupinstall "Development tools" -y
-RUN yum --enablerepo=remi install php \
+# install os libs
+RUN yum install -y php \
     php-imagick \
     php-gd \
     php-mysqli \
     php-pecl-apc \
     php-pecl-memcache \
     php-mbstring httpd \
-    sudo -y
+    sudo which tar
+RUN curl -sL https://rpm.nodesource.com/setup | bash - && \
+    yum install -y nodejs
+RUN yum install -y gcc-c++ make
 
-# Install Composer
-RUN curl -sS https://getcomposer.org/installer | php
-RUN mv composer.phar /usr/local/bin/composer
+# install and setup supervisord
+RUN yum install python-setuptools -y && \
+    easy_install pip && \
+    pip install supervisor==3.1.2
+COPY etc/supervisord /etc/supervisord
 
-# Install NPM
-RUN yum install npm -y
+# Install app libs
+# Composer (PHP Packagemanger)
+RUN curl -sS https://getcomposer.org/installer | php \
+    && mv composer.phar /usr/local/bin/composer
 
-# Install Compass + Sass
-RUN yum install which tar -y
-RUN curl -sSL https://get.rvm.io | bash
-RUN /bin/bash -lc 'rvm install 2.1'
-RUN /bin/bash -lc 'rvm use 2.1 --default'
-RUN /bin/bash -lc 'gem install compass sass --no-rdoc --no-ri'
+# Compass + Sass
+RUN curl -sSL https://get.rvm.io | bash && \
+    /bin/bash -lc 'rvm install 2.1' && \
+    /bin/bash -lc 'rvm use 2.1 --default' && \
+    /bin/bash -lc 'gem install compass sass --no-rdoc --no-ri'
 
-# Install grunt-cli (workaround)
+# grunt-cli (workaround)
 RUN npm install -g grunt-cli
-
-# Done
-RUN echo $(php --version | grep -m 1 PHP)                   >> /tmp/env-installed.txt
-RUN echo $(git --version)                                   >> /tmp/env-installed.txt
-RUN echo $(composer --version)                              >> /tmp/env-installed.txt
-RUN /bin/bash -lc 'echo $(compass -v | grep -m 1 Compass)   >> /tmp/env-installed.txt'
-RUN /bin/bash -lc 'echo $(sass -v | grep -m 1 Sass)         >> /tmp/env-installed.txt'
-RUN echo $(grunt -v | grep -m 1 grunt-cli)                  >> /tmp/env-installed.txt
-
-RUN cat /tmp/env-installed.txt
-RUN echo FINISHED SERVER BUILD [$(date)]
-
-EXPOSE 80
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord/supervisord.conf"]

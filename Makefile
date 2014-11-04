@@ -1,7 +1,7 @@
-all: build push
+all: build
 
 build:
-	docker build -t renegare/docker-web-php54:latest .
+	docker build --rm -t renegare/docker-web-php54:latest .
 
-push:
-	docker push renegare/docker-web-php54
+run:
+	docker run --rm -it renegare/docker-web-php54:latest /bin/bash
