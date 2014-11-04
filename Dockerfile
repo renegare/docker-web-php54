@@ -44,4 +44,7 @@ RUN curl -sSL https://get.rvm.io | bash && \
 # grunt-cli (workaround)
 RUN npm install -g grunt-cli
 
+# git
+RUN yum install -y git
+
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord/supervisord.conf"]
